@@ -1,6 +1,48 @@
 import argparse
 import mmap
 import re
+import numpy
+import random
+
+class BatchReader():
+    def __init__(self, file, pos_list):
+        self.file = file
+        self.pos_list = pos_list
+        self.next_index = 0
+
+    def get_all_tweet(self):
+        tw_list = []
+        for (start, end) in self.pos_list:
+            self.file.seek(start)
+            tw_list.append(self.file.read(end-start))
+        return tw_list
+
+    def random_batch(self, size):
+        if len(self.pos_list) <= size:
+            tw_list = self.get_all_tweet()
+            random.shuffle(tw_list)
+        
+        else:
+            tw_list = []
+            idx_list = numpy.random.choice(len(self.pos_list), size)
+            for idx in idx_list:
+                (start, end) = self.pos_list[idx]
+                self.file.seek(start)
+                tw_list.append(self.file.read(end-start))
+
+        return tw_list
+
+    def next_batch(self, size):
+        if len(self.pos_list) <= size:
+            tw_list = self.get_all_tweet()
+
+        else:
+            pass
+
+        return tw_list
+
+    def reset(self):
+        self.next_index = 0
 
 def get_arg():
     parser = argparse.ArgumentParser()
@@ -12,8 +54,14 @@ def get_arg():
     parser.add_argument('--batch_size', type=int, help='set RNN batch size', default=1)
     parser.add_argument('file', type=argparse.FileType('r'), help='path of input file', metavar='FILE_PATH')
     args = parser.parse_args()
-    print(args)
 
     input_file = args.file
+    input_data = input_file.read()
+    
+    tweet_pos = []
+    for m in re.finditer(r'.+?(:?\n\n|$)', input_data, re.DOTALL):
+        tweet_pos.append((m.start(), m.end()))
+
+    return args, BatchReader(input_file, tweet_pos)
 
 get_arg()
