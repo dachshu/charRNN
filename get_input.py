@@ -33,11 +33,24 @@ class BatchReader():
         return tw_list
 
     def next_batch(self, size):
-        if len(self.pos_list) <= size:
+        pos_len = len(self.pos_list)
+        if pos_len <= size and self.next_index == 0:
             tw_list = self.get_all_tweet()
+            self.next_index = pos_len
 
         else:
-            pass
+            if pos_len - self.next_index <= size:
+                tw_range = pos_len - self.next_index
+            else:
+                tw_range = size
+
+            tw_list = []
+            for i in range(self.next_index, self.next_index+tw_range):
+                (start, end) = self.pos_list[i]
+                self.file.seek(start)
+                tw_list.append(self.file.read(end-start))
+
+            self.next_index += tw_range
 
         return tw_list
 
