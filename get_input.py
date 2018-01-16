@@ -28,7 +28,7 @@ class BatchReader():
             for idx in idx_list:
                 (start, end) = self.pos_list[idx]
                 self.file.seek(start)
-                tw_list.append(self.file.read(end-start))
+                tw_list.append(self.file.read(end-start).decode('utf-8'))
 
         return tw_list
 
@@ -48,7 +48,7 @@ class BatchReader():
             for i in range(self.next_index, self.next_index+tw_range):
                 (start, end) = self.pos_list[i]
                 self.file.seek(start)
-                tw_list.append(self.file.read(end-start))
+                tw_list.append(self.file.read(end-start).decode('utf-8'))
 
             self.next_index += tw_range
 
@@ -65,16 +65,19 @@ def get_arg():
     parser.add_argument('--learning_rate', type=float, help='set RNN learning rate', default=0.001)
     parser.add_argument('--dropout_rate', type=float, nargs=2, help='set RNN dropout rate', default=[0.5, 0.5], metavar=('INPUT_DROP_RATE', 'OUTPUT_DROP_RATE'))
     parser.add_argument('--batch_size', type=int, help='set RNN batch size', default=1)
-    parser.add_argument('file', type=argparse.FileType('r'), help='path of input file', metavar='FILE_PATH')
+    parser.add_argument('file', type=argparse.FileType('rb'), help='path of input file', metavar='FILE_PATH')
     args = parser.parse_args()
 
     input_file = args.file
     input_data = input_file.read()
     
     tweet_pos = []
-    for m in re.finditer(r'.+?(:?\n\n|$)', input_data, re.DOTALL):
+    for m in re.finditer(b'.+?(:?\n\n|$)', input_data, re.DOTALL):
         tweet_pos.append((m.start(), m.end()))
 
     return args, BatchReader(input_file, tweet_pos)
 
-get_arg()
+if __name__ == '__main__':
+    args, br = get_arg()
+    print(args)
+    print(br.random_batch(10))
