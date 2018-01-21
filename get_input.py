@@ -1,5 +1,4 @@
 import argparse
-import mmap
 import re
 import numpy
 import random
