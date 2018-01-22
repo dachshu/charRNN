@@ -4,11 +4,12 @@ import sys
 import tensorflow as tf
 import matplotlib
 import matplotlib.pyplot as plt
+import datetime
 
 def normalize(data):
-    numerator = data - np.min(data, 0)
-    denominator = np.max(data, 0) - np.min(data, 0)
-    return numerator / (denominator + 1e-7), numerator, denominator
+    numerator = data - np.amin(data, 0)
+    denominator = np.amax(data, 0) - np.amin(data, 0) + 1e-7
+    return numerator / (denominator), np.amin(data,0), denominator
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -22,13 +23,25 @@ if __name__ == '__main__':
 
     input_data = args.file.read()
     input_data = input_data.splitlines()
-    input_data = [[int(time)] for time in input_data]
-    input_data = np.array(input_data)
-    normal_data, n, d = normalize(input_data)
 
     if len(input_data) <= args.seq_length:
         print('too few input data')
         sys.exit(1)
+
+    input_data = [int(time) for time in input_data]
+    input_data.sort()
+    data = []
+    for i, time in enumerate(input_data):
+        dtime = datetime.datetime.fromtimestamp(time)
+        dtime = dtime.hour*60*60 + dtime.minute*60 + dtime.second
+        if i == 0:
+            data.append([dtime, 0])
+        else:
+            data.append([dtime, time - input_data[i-1]])
+
+    data = np.array(data)
+    normal_data, n, d = normalize(data)
+    #normal_data = data
 
     x = normal_data
     y = normal_data
@@ -43,19 +56,21 @@ if __name__ == '__main__':
         dataX.append(_x)
         dataY.append(_y)
 
-    train_size = int(len(dataY)*0.7)
+    train_size = int(len(dataY)*0.95)
     train_x, test_x = np.array(dataX[:train_size]), np.array(dataX[train_size:])
     train_y, test_y = np.array(dataY[:train_size]), np.array(dataY[train_size:])
+    out_dim = 2
 
-    X = tf.placeholder(tf.float32, [None, args.seq_length, 1])
-    Y = tf.placeholder(tf.float32, [None, 1])
+    X = tf.placeholder(tf.float32, [None, args.seq_length, 2], name='X')
+    Y = tf.placeholder(tf.float32, [None, out_dim], name='Y')
 
     def rnn_cell():
         return tf.contrib.rnn.BasicLSTMCell(num_units=args.hidden_state, state_is_tuple=True, activation=tf.tanh)
 
     cell = tf.contrib.rnn.MultiRNNCell([rnn_cell() for _ in range(args.num_layers)], state_is_tuple=True)
     outputs, _ = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
-    Y_pred = tf.contrib.layers.fully_connected(outputs[:, -1], 1, activation_fn=None)
+    Y_pred = tf.contrib.layers.fully_connected(outputs[:, -1], out_dim, activation_fn=None)
+    Y_pred = tf.identity(Y_pred, name='y_pred')
 
     loss = tf.reduce_mean(tf.square(Y_pred - Y))
     optimizer = tf.train.AdamOptimizer(args.learning_rate)
@@ -69,10 +84,18 @@ if __name__ == '__main__':
         print('epoch: %d, loss: %f' % (i, l))
 
     saver = tf.train.Saver()
-    save_path = saver.save(sess, './save/time_model_trained.cpkt')
+    save_path = saver.save(sess, './save/time_model_trained.ckpt')
     print('The model is saved in', save_path)
 
     pre_y = sess.run(Y_pred, feed_dict={X:test_x})
     plt.plot(test_y)
     plt.plot(pre_y)
     plt.show()
+    pre_y = pre_y*d+n
+    for py in pre_y:
+        py[0] = int(py[0])
+        py[1] = int(py[1])
+        h = py[0]//3600
+        m = py[0]%3600//60
+        s = py[0]%3600%60
+        print('%d:%d:%d, %d'%(h,m,s, py[1]))
