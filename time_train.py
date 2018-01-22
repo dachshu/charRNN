@@ -50,7 +50,10 @@ if __name__ == '__main__':
     X = tf.placeholder(tf.float32, [None, args.seq_length, 1])
     Y = tf.placeholder(tf.float32, [None, 1])
 
-    cell = tf.contrib.rnn.BasicLSTMCell(num_units=args.hidden_state, activation=tf.tanh)
+    def rnn_cell():
+        return tf.contrib.rnn.BasicLSTMCell(num_units=args.hidden_state, state_is_tuple=True, activation=tf.tanh)
+
+    cell = tf.contrib.rnn.MultiRNNCell([rnn_cell() for _ in range(args.num_layers)], state_is_tuple=True)
     outputs, _ = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
     Y_pred = tf.contrib.layers.fully_connected(outputs[:, -1], 1, activation_fn=None)
 
@@ -64,6 +67,10 @@ if __name__ == '__main__':
     for i in range(args.epoch):
         _, l = sess.run([train, loss], feed_dict={X: train_x, Y: train_y})
         print('epoch: %d, loss: %f' % (i, l))
+
+    saver = tf.train.Saver()
+    save_path = saver.save(sess, './save/time_model_trained.cpkt')
+    print('The model is saved in', save_path)
 
     pre_y = sess.run(Y_pred, feed_dict={X:test_x})
     plt.plot(test_y)
