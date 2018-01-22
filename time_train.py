@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 import datetime
 
 def normalize(data):
-    numerator = data - np.amin(data, 0)
-    denominator = np.amax(data, 0) - np.amin(data, 0) + 1e-7
-    return numerator / (denominator), np.amin(data,0), denominator
+    min_val = np.zeros(data.shape[1])
+    numerator = data - min_val
+    denominator = np.amax(data, 0) - min_val + 1e-7
+    return numerator / (denominator), min_val, denominator
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -42,6 +43,8 @@ if __name__ == '__main__':
     data = np.array(data)
     normal_data, n, d = normalize(data)
     #normal_data = data
+    num = tf.get_variable('num', initializer=tf.constant(n, dtype=tf.float32))
+    denom = tf.get_variable('denom', initializer=tf.constant(d, dtype=tf.float32))
 
     x = normal_data
     y = normal_data
@@ -52,7 +55,6 @@ if __name__ == '__main__':
     for i in range(len(x) - args.seq_length):
         _x = x[i:i+args.seq_length]
         _y = y[i+args.seq_length]
-        print(_x, '->', _y)
         dataX.append(_x)
         dataY.append(_y)
 
@@ -73,19 +75,25 @@ if __name__ == '__main__':
     Y_pred = tf.identity(Y_pred, name='y_pred')
 
     loss = tf.reduce_mean(tf.square(Y_pred - Y))
+#loss = loss + tf.reduce_sum(tf.cast(tf.less_equal(Y_pred, 0), tf.float32)*100)
+    print(loss.shape)
+    print(Y_pred.shape)
     optimizer = tf.train.AdamOptimizer(args.learning_rate)
     train = optimizer.minimize(loss)
 
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
+    saver = tf.train.Saver()
 
+    save_step = 0
     for i in range(args.epoch):
         _, l = sess.run([train, loss], feed_dict={X: train_x, Y: train_y})
         print('epoch: %d, loss: %f' % (i, l))
 
-    saver = tf.train.Saver()
-    save_path = saver.save(sess, './save/time_model_trained.ckpt')
-    print('The model is saved in', save_path)
+        if i % (args.epoch//20) == 0:
+            save_path = saver.save(sess, './save/time_model_trained', save_step)
+            save_step += 1
+            print('The model is saved in', save_path)
 
     pre_y = sess.run(Y_pred, feed_dict={X:test_x})
     plt.plot(test_y)

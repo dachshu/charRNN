@@ -2,33 +2,48 @@ import argparse
 import numpy as np
 import tensorflow as tf
 import datetime
+import time
 
-def get_next_remaining_seconds():
-    with open('time_log', 'r+') as f:
-        data = f.read()
-        data = data.splitlines()
-        data = [[int(time)] for time in data]
-        data = np.array(data)
-        data = np.sort(data, 0)
-        data, n, d = normalize(data)
+def get_next_remaining_seconds(file_name='time_log'):
+    with open(file_name, 'r+') as f:
+        input_data = f.read()
+        input_data = input_data.splitlines()
+        input_data = [int(time) for time in input_data]
+        input_data.sort()
+        input_data = input_data[-11:]
+        data = []
+        for i, time in enumerate(input_data):
+            dtime = datetime.datetime.fromtimestamp(time)
+            dtime = dtime.hour*60*60 + dtime.minute*60 + dtime.second
+            if i == 0:
+                data.append([dtime, 0])
+            else:
+                data.append([dtime, time - input_data[i-1]])
 
-        sess = tf.Session()
-        saver = tf.train.import_meta_graph('./save/time_model_trained.cpkt.meta')
-        saver.restore(sess, './save/time_model_trained.ckpt')
+        data = np.array(data, dtype=np.float32)
 
-        graph = tf.get_default_graph()
-        X = graph.get_tensor_by_name('X:0')
-        Y_pred = graph.get_tensor_by_name('y_pred:0')
+        with tf.Session() as sess:
+            ckpt_name = tf.train.latest_checkpoint('./save')
+            saver = tf.train.import_meta_graph(ckpt_name + '.meta')
+            saver.restore(sess, tf.train.latest_checkpoint('./save'))
 
-        pre_y = sess.run(Y_pred, feed_dict={X:[normal_data[-10:]]})
+            graph = tf.get_default_graph()
+            X = graph.get_tensor_by_name('X:0')
+            Y_pred = graph.get_tensor_by_name('y_pred:0')
+            n = graph.get_tensor_by_name('num:0').eval()
+            d = graph.get_tensor_by_name('denom:0').eval()
+            normal_data = (data-n)/d
+            normal_data = normal_data[-10:]
+            normal_data = np.reshape(normal_data, (1,10,-1))
 
-def unnormalize(data, n, d):
-    return data*d+n
+            pre_y = sess.run(Y_pred, feed_dict={X:normal_data})
+            pre_y = pre_y*d-n
+            cur_time = int(time.time())
 
-def normalize(data):
-    numerator = data - np.amin(data, 0)
-    denominator = np.amax(data, 0) - np.amin(data, 0) + 1e-7
-    return numerator / denominator, np.amin(data,0), denominator
+            if (cur_time - input_data[-1])//int(pre_y[1]) >= 1:
+                return 0;
+            else:
+                return int(pre_y[1]) - (cur_time - input_data[-1])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -39,6 +54,7 @@ if __name__ == '__main__':
     input_data = input_data.splitlines()
     input_data = [int(time) for time in input_data]
     input_data.sort()
+    input_data = input_data[-11:]
     data = []
     for i, time in enumerate(input_data):
         dtime = datetime.datetime.fromtimestamp(time)
@@ -48,19 +64,24 @@ if __name__ == '__main__':
         else:
             data.append([dtime, time - input_data[i-1]])
 
-    data = np.array(data)
-    normal_data, n, d = normalize(data)
+    data = np.array(data, dtype=np.float32)
 
-    sess = tf.Session()
-    saver = tf.train.import_meta_graph('./save/time_model_trained.ckpt.meta')
-    saver.restore(sess, './save/time_model_trained.ckpt')
+    with tf.Session() as sess:
+        ckpt_name = tf.train.latest_checkpoint('./save')
+        saver = tf.train.import_meta_graph(ckpt_name + '.meta')
+        saver.restore(sess, tf.train.latest_checkpoint('./save'))
 
-    graph = tf.get_default_graph()
-    X = graph.get_tensor_by_name('X:0')
-    Y_pred = graph.get_tensor_by_name('y_pred:0')
+        graph = tf.get_default_graph()
+        X = graph.get_tensor_by_name('X:0')
+        Y_pred = graph.get_tensor_by_name('y_pred:0')
+        n = graph.get_tensor_by_name('num:0').eval()
+        d = graph.get_tensor_by_name('denom:0').eval()
+        normal_data = (data-n)/d
+        normal_data = normal_data[-10:]
+        normal_data = np.reshape(normal_data, (1,10,-1))
 
-    pre_y = sess.run(Y_pred, feed_dict={X:[normal_data[-10:]]})
-    print(normal_data[-10:])
-    print(n, d)
-    print(pre_y)
-    print(pre_y*d+n)
+        pre_y = sess.run(Y_pred, feed_dict={X:normal_data})
+        print(normal_data[-10:])
+        print(n, d)
+        print(pre_y)
+        print(pre_y*d+n)
