@@ -4,6 +4,16 @@ import tensorflow as tf
 import datetime
 import time
 
+def update_log(file_name='time_log'):
+    cur_time = time.time()
+    with open(file_name, 'r') as f:
+        data = f.read()
+        time_data = data.splitlines()
+        time_data = time_data[1:]
+        time_data.append(str(cur_time))
+    with open(file_name, 'w') as f:
+        f.write('\n'.join(time_data))
+
 def get_next_remaining_seconds(file_name='time_log'):
     with open(file_name, 'r+') as f:
         input_data = f.read()
@@ -23,9 +33,9 @@ def get_next_remaining_seconds(file_name='time_log'):
         data = np.array(data, dtype=np.float32)
 
         with tf.Session() as sess:
-            ckpt_name = tf.train.latest_checkpoint('./save')
+            ckpt_name = tf.train.latest_checkpoint('./time_save')
             saver = tf.train.import_meta_graph(ckpt_name + '.meta')
-            saver.restore(sess, tf.train.latest_checkpoint('./save'))
+            saver.restore(sess, tf.train.latest_checkpoint('./time_save'))
 
             graph = tf.get_default_graph()
             X = graph.get_tensor_by_name('X:0')
@@ -67,9 +77,9 @@ if __name__ == '__main__':
     data = np.array(data, dtype=np.float32)
 
     with tf.Session() as sess:
-        ckpt_name = tf.train.latest_checkpoint('./save')
+        ckpt_name = tf.train.latest_checkpoint('./time_save')
         saver = tf.train.import_meta_graph(ckpt_name + '.meta')
-        saver.restore(sess, tf.train.latest_checkpoint('./save'))
+        saver.restore(sess, tf.train.latest_checkpoint('./time_save'))
 
         graph = tf.get_default_graph()
         X = graph.get_tensor_by_name('X:0')
@@ -81,7 +91,11 @@ if __name__ == '__main__':
         normal_data = np.reshape(normal_data, (1,10,-1))
 
         pre_y = sess.run(Y_pred, feed_dict={X:normal_data})
-        print(normal_data[-10:])
-        print(n, d)
-        print(pre_y)
-        print(pre_y*d+n)
+        pre_y = pre_y*d+n
+        
+        t = int(pre_y[0][0])
+        print(t)
+        h = t//3600 + 9
+        m = t%3600//60
+        s = t%3600%60
+        print('%d:%d:%d' % (h, m, s))
