@@ -91,7 +91,7 @@ if __name__ == '__main__':
         print('epoch: %d, loss: %f' % (i, l))
 
         if i % (args.epoch//20) == 0:
-            save_path = saver.save(sess, './save/time_model_trained', save_step)
+            save_path = saver.save(sess, './time_save/time_model_trained', save_step)
             save_step += 1
             print('The model is saved in', save_path)
 
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     for py in pre_y:
         py[0] = int(py[0])
         py[1] = int(py[1])
-        h = py[0]//3600
+        h = (py[0]//3600 + 9)%24
         m = py[0]%3600//60
         s = py[0]%3600%60
         print('%d:%d:%d, %d'%(h,m,s, py[1]))
